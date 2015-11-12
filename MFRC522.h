@@ -76,7 +76,7 @@
 #define MFRC522_h
 
 #include <Arduino.h>
-#include <SPI.h>
+//#include <SPI.h>
 
 // Firmware data for self-test
 // Reference values based on firmware version

@@ -43,8 +43,17 @@ void MFRC522::PCD_WriteRegister(	byte reg,		///< The register to write to. One o
 									byte value		///< The value to write.
 								) {
 	digitalWrite(_chipSelectPin, LOW);		// Select slave
-	SPI.transfer(reg & 0x7E);				// MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
-	SPI.transfer(value);
+	//Serial.print("Write Register ");
+	//Serial.print(reg>>1);
+	//Serial.print(" with value ");
+	//Serial.println(value);
+	byte wbuf[2];
+	byte rbuf[2];
+	wbuf[0] = reg & 0x7E;
+	wbuf[1] = value;
+	SPI.xfer1(wbuf, rbuf, 2);
+	//SPI.transfer(reg & 0x7E);				// MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
+	//SPI.transfer(value);
 	digitalWrite(_chipSelectPin, HIGH);		// Release slave again
 } // End PCD_WriteRegister()
 
@@ -57,10 +66,24 @@ void MFRC522::PCD_WriteRegister(	byte reg,		///< The register to write to. One o
 									byte *values	///< The values to write. Byte array.
 								) {
 	digitalWrite(_chipSelectPin, LOW);		// Select slave
-	SPI.transfer(reg & 0x7E);				// MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
+	//Serial.print("Write Register ");
+	//Serial.print(reg>>1);
+	byte *wbuf;
+	byte *rbuf;
+	wbuf = new byte[count+1];
+	rbuf = new byte[count+1];
+	wbuf[0] = reg & 0x7E;
+	memcpy(&(wbuf[1]), values, count);
+	SPI.xfer1(wbuf, rbuf, count+1);
+	/*SPI.transfer(reg & 0x7E);				// MSB == 0 is for writing. LSB is not used in address. Datasheet section 8.1.2.3.
 	for (byte index = 0; index < count; index++) {
+	  Serial.print(" with value ");
+	  Serial.print(values[index]);
 		SPI.transfer(values[index]);
-	}
+	}*/
+	delete[] wbuf;
+	delete[] rbuf;
+	//Serial.println(" ");
 	digitalWrite(_chipSelectPin, HIGH);		// Release slave again
 } // End PCD_WriteRegister()
 
@@ -72,9 +95,19 @@ byte MFRC522::PCD_ReadRegister(	byte reg	///< The register to read from. One of 
 								) {
 	byte value;
 	digitalWrite(_chipSelectPin, LOW);			// Select slave
-	SPI.transfer(0x80 | (reg & 0x7E));			// MSB == 1 is for reading. LSB is not used in address. Datasheet section 8.1.2.3.
-	value = SPI.transfer(0);					// Read the value back. Send 0 to stop reading.
+	//Serial.print("Read Register ");
+	//Serial.print(reg>>1);
+	byte wbuf[2];
+	byte rbuf[2];
+	wbuf[0] = 0x80 | (reg & 0x7E);
+	wbuf[1] = 0;
+	SPI.xfer1(wbuf, rbuf, 2);
+	value = rbuf[1];
+	//SPI.transfer(0x80 | (reg & 0x7E));			// MSB == 1 is for reading. LSB is not used in address. Datasheet section 8.1.2.3.
+	//value = SPI.transfer(0);					// Read the value back. Send 0 to stop reading.
 	digitalWrite(_chipSelectPin, HIGH);			// Release slave again
+	//Serial.print(" got value ");
+	//Serial.println(value);
 	return value;
 } // End PCD_ReadRegister()
 
@@ -94,7 +127,7 @@ void MFRC522::PCD_ReadRegister(	byte reg,		///< The register to read from. One o
 	byte address = 0x80 | (reg & 0x7E);		// MSB == 1 is for reading. LSB is not used in address. Datasheet section 8.1.2.3.
 	byte index = 0;							// Index in values array.
 	digitalWrite(_chipSelectPin, LOW);		// Select slave
-	count--;								// One read is performed outside of the loop
+	/*count--;								// One read is performed outside of the loop
 	SPI.transfer(address);					// Tell MFRC522 which address we want to read
 	while (index < count) {
 		if (index == 0 && rxAlign) {		// Only update bit positions rxAlign..7 in values[0]
@@ -113,8 +146,21 @@ void MFRC522::PCD_ReadRegister(	byte reg,		///< The register to read from. One o
 		}
 		index++;
 	}
-	values[index] = SPI.transfer(0);			// Read the final byte. Send 0 to stop reading.
+	values[index] = SPI.transfer(0);			// Read the final byte. Send 0 to stop reading.*/
+	byte *wbuf;
+	byte *rbuf;
+	wbuf = new byte[count+1];
+	rbuf = new byte[count+1];
+	for(int i=0;i<count;i++){
+		wbuf[i] = 0x80 | (reg & 0x7E);
+	}
+	wbuf[count] = 0;
+	SPI.xfer1(wbuf, rbuf, count+1);
+	memcpy(values, &(rbuf[1]), count);
+	delete[] wbuf;
+	delete[] rbuf;
 	digitalWrite(_chipSelectPin, HIGH);			// Release slave again
+	
 } // End PCD_ReadRegister()
 
 /**
@@ -396,6 +442,7 @@ byte MFRC522::PCD_CommunicateWithPICC(	byte command,		///< The command to execut
 	byte bitFraming = (rxAlign << 4) + txLastBits;		// RxAlign = BitFramingReg[6..4]. TxLastBits = BitFramingReg[2..0]
 	
 	PCD_WriteRegister(CommandReg, PCD_Idle);			// Stop any active command.
+	//PCD_WriteRegister(ComIEnReg, 0xf7);					// Clear all seven interrupt request bits
 	PCD_WriteRegister(ComIrqReg, 0x7F);					// Clear all seven interrupt request bits
 	PCD_SetRegisterBitMask(FIFOLevelReg, 0x80);			// FlushBuffer = 1, FIFO initialization
 	PCD_WriteRegister(FIFODataReg, sendLen, sendData);	// Write sendData to the FIFO
